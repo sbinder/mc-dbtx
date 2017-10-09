@@ -11,6 +11,7 @@ namespace DBTX
 {
     class Program
     {
+
         static void Main(string[] args)
         {
             var MSconnectionString = @"Data Source=s11.winhost.com;Initial Catalog=DB_77982_tutor;Persist Security Info=True;User ID=DB_77982_tutor_user;Password=SPxLv4J;MultipleActiveResultSets=True";
@@ -20,9 +21,85 @@ namespace DBTX
             srcConnection.Open();
             destConnection.Open();
             TransferStudents(destConnection, srcConnection);
+            //TransferProgress(destConnection, srcConnection);
 
             Console.Write("Press any key");
             Console.ReadKey();
+        }
+
+        static bool TransferProgress(MySqlConnection dest, SqlConnection src, uint deststid, uint srcstid)
+        {
+
+            Dictionary<int, int> prayermap = new Dictionary<int, int>
+            {
+                { 3, 11 },
+                { 4, 10 },
+                { 5, 20},
+                {6, 21},
+                {7, 22},
+                {8, 23},
+                {11, 25},
+                {14, 26},
+                {15, 27},
+                {16, 28},
+                {17, 4},
+                {18, 3},
+                {19, 2},
+                {20, 29},
+                {22, 30},
+                {23, 31},
+                {24, 7},
+                {25, 9},
+                {26, 12},
+                {27, 24},
+                {28, 6},
+                {29, 8}
+            };
+            //var scmd = src.CreateCommand();
+            var icmd = src.CreateCommand();
+            var ocmd = dest.CreateCommand();
+            //scmd.CommandText = "select stid from student";
+            icmd.CommandText = "select top 1 * from dbo.lessontask where STID = @stid and TaskID = @taskid order by date desc";
+            ocmd.CommandText = "insert into progress (tid, stid, taskid, date, rating, tcomment, scomment) " +
+                "values (1, @stid, @taskid, @date, @rating, @tcomment, @scomment)";
+
+            ocmd.Parameters.AddWithValue("@stid", deststid);
+            ocmd.Parameters.Add("@taskid", MySqlDbType.UInt32);
+            ocmd.Parameters.Add("@date", MySqlDbType.Date);
+            ocmd.Parameters.Add("@rating", MySqlDbType.Int16);
+            ocmd.Parameters.Add("@tcomment", MySqlDbType.VarChar);
+            ocmd.Parameters.Add("@scomment", MySqlDbType.VarChar);
+
+            //icmd.Parameters.Add("@stid", SqlDbType.Int);
+            icmd.Parameters.AddWithValue("@stid", (int)srcstid);
+            icmd.Parameters.Add("@taskid", SqlDbType.Int);
+
+            foreach (KeyValuePair<int, int> entry in prayermap)
+            {
+                icmd.Parameters["@taskid"].Value = entry.Key;
+                using (var ireader = icmd.ExecuteReader())
+                {
+                    if (ireader.Read())
+                    {
+
+                        //var r = ireader.GetInt32(ireader.GetOrdinal("rating"));
+                        var r = ireader["rating"].ToString();
+                        int rat;
+                        if (!int.TryParse(r, out rat)) rat = 0;
+                        
+                            rat = 100 * rat;
+                        
+                        ocmd.Parameters["@taskid"].Value = entry.Value;
+                        ocmd.Parameters["@date"].Value = ireader.GetDateTime(ireader.GetOrdinal("date")).Date;
+                        ocmd.Parameters["@rating"].Value = rat;
+                        ocmd.Parameters["@tcomment"].Value = ireader.GetString(ireader.GetOrdinal("tcomment"));
+                        ocmd.Parameters["@scomment"].Value = ireader.GetString(ireader.GetOrdinal("scomment"));
+                        ocmd.ExecuteNonQuery();
+                    }
+
+                }
+            }
+            return true;
         }
 
         static bool TransferStudents(MySqlConnection dest, SqlConnection src)
@@ -81,25 +158,27 @@ namespace DBTX
             {
                 while (qreader.Read())
                 {
-                    Console.WriteLine(qreader["Target"].ToString() + " " + 
+                    Console.WriteLine(qreader["Target"].ToString() + " " +
                         qreader["LName"] + ", " + qreader["FName"]);
 
                     // Parent Record
                     uint npid;
                     uint nstid;
+                    var orig_stid = uint.Parse(qreader["STID"].ToString());
                     var pid = uint.Parse(qreader["Parent"].ToString());
                     if (pdict.TryGetValue(pid, out npid))
                     {
                         Console.WriteLine("   PARENT EXISTS. PID:" + npid);
                         continue;
-                    } else
+                    }
+                    else
                     {
                         // pcmd.Parameters.Clear();
                         pcmd.Parameters["@pid"].Value = pid;    // .AddWithValue("@pid", pid);
                         using (var preader = pcmd.ExecuteReader())
                         {
                             preader.Read();
-                            Console.WriteLine("=> Found parent record: " + preader["Lname1"] + ", " + preader["Fname1"] );
+                            Console.WriteLine("=> Found parent record: " + preader["Lname1"] + ", " + preader["Fname1"]);
 
                             Dpcmd.Parameters.Clear();
 
@@ -118,23 +197,9 @@ namespace DBTX
                             Dpcmd.Parameters.AddWithValue("@zip", preader["Zip"]);
                             Dpcmd.Parameters.AddWithValue("@comment", preader["Comment"]);
 
-                            //Dpcmd.Parameters["@title1"].Value = preader["Title1"];
-                            //Dpcmd.Parameters["@lname1"].Value = preader["Lname1"];
-                            //Dpcmd.Parameters["@fname1"].Value = preader["Fname1"];
-                            //Dpcmd.Parameters["@email1"].Value = preader["Email1"];
-                            //Dpcmd.Parameters["@title2"].Value = preader["Title2"];
-                            //Dpcmd.Parameters["@fname2"].Value = preader["Fname2"];
-                            //Dpcmd.Parameters["@lname2"].Value = preader["LName2"];
-                            //Dpcmd.Parameters["@email2"].Value = preader["Email2"];
-                            //Dpcmd.Parameters["@address1"].Value = preader["Address1"];
-                            //Dpcmd.Parameters["@address2"].Value = preader["Address2"];
-                            //Dpcmd.Parameters["@city"].Value = preader["City"];
-                            //Dpcmd.Parameters["@state"].Value = preader["State"];
-                            //Dpcmd.Parameters["@zip"].Value = preader["Zip"];
-                            //Dpcmd.Parameters["@comment"].Value = preader["Comment"];
-
                             // INSERT PARENT RECORD
                             npid = uint.Parse(Dpcmd.ExecuteScalar().ToString());
+                            //npid = 1;
 
                             pdict.Add(pid, npid); // this should be new PID
                             Console.WriteLine("    Added parent " + npid);
@@ -157,27 +222,27 @@ namespace DBTX
                         Dscmd.Parameters.AddWithValue("@expires", new DateTime(2099, 1, 1));
                         Dscmd.Parameters.AddWithValue("@note", string.Empty);
 
-
-                        //Dscmd.Parameters["@target"].Value = qreader["Target"];
-                        //Dscmd.Parameters["@lname"].Value = qreader["Lname"];
-                        //Dscmd.Parameters["@fname"].Value = qreader["Fname"];
-                        //Dscmd.Parameters["@parent"].Value = npid;
-                        //Dscmd.Parameters["@teacher"].Value = 1;
-                        //Dscmd.Parameters["@email"].Value = qreader["Email"];
-                        //Dscmd.Parameters["@username"].Value = qreader["Username"];
-                        //Dscmd.Parameters["@password"].Value = qreader["Password"];
-                        //Dscmd.Parameters["@male"].Value = (char)qreader["Gender"] == 'M';
-                        //Dscmd.Parameters["@trial"].Value = false;
-                        //Dscmd.Parameters["@liturgy"].Value = 0;
-
+                        // INSERT STUDENT RECORD
                         nstid = uint.Parse(Dscmd.ExecuteScalar().ToString());
+                        //nstid = 2;
 
                         Console.WriteLine("   Added student " + nstid);
+                        TransferProgress(dest, src, nstid, orig_stid);
                     }
                 }
                 return true;
-
             }
+        }
+    }
+    class Prayer
+    {
+        int oid;
+        int pid;
+
+        Prayer(int o, int p)
+        {
+            this.oid = o;
+            this.pid = p;
         }
     }
 }
