@@ -87,7 +87,7 @@ namespace DBTX
                         int rat;
                         if (!int.TryParse(r, out rat)) rat = 0;
                         
-                            rat = 100 * rat;
+                            rat = 10 * rat;
                         
                         ocmd.Parameters["@taskid"].Value = entry.Value;
                         ocmd.Parameters["@date"].Value = ireader.GetDateTime(ireader.GetOrdinal("date")).Date;
