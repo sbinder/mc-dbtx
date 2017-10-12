@@ -110,10 +110,13 @@ namespace DBTX
             var scmd = src.CreateCommand();
             var pcmd = src.CreateCommand();
             var Dpcmd = dest.CreateCommand();
+            var Dphcmd = dest.CreateCommand();
 
             scmd.CommandText = "select * from dbo.student where Target > '2017-09-01' order by Target";
             pcmd.CommandText = "select * from dbo.parent where pid = @pid";
             pcmd.Parameters.Add(new SqlParameter("@pid", 0));
+            Dphcmd.CommandText = "insert into phones (family, phone, label) values (@family, @phone, @label)";
+
 
             Dpcmd.CommandText = "insert into parent (org, title1, lname1, fname1, email1, " +
                 "title2, lname2, fname2, email2, address1, address2, city, state, zip, comment) " +
@@ -137,9 +140,10 @@ namespace DBTX
 
             var Dscmd = dest.CreateCommand();
             Dscmd.CommandText = "insert into student (org, target, lname, fname, parent, teacher, " +
-                "email, note, username, password, expires, male, trial, liturgy) " +
+                "email, note, username, password, expires, male, trial, liturgy, torah, haftara) " +
                 "values(1, @target, @lname, @fname, @parent, @teacher, " +
-                "@email, @note, @username, @password, @expires, @male, @trial, @liturgy); select last_insert_id()";
+                "@email, @note, @username, @password, @expires, @male, @trial, " +
+                "@liturgy, @torah, @haftara); select last_insert_id()";
             Dscmd.Parameters.Add(new MySqlParameter("@target", SqlDbType.DateTime));
             Dscmd.Parameters.Add(new MySqlParameter("@lname", SqlDbType.VarChar));
             Dscmd.Parameters.Add(new MySqlParameter("@fname", SqlDbType.VarChar));
@@ -153,6 +157,13 @@ namespace DBTX
             Dscmd.Parameters.Add(new MySqlParameter("@male", SqlDbType.Bit));
             Dscmd.Parameters.Add(new MySqlParameter("@trial", SqlDbType.Bit));
             Dscmd.Parameters.Add(new MySqlParameter("@liturgy", SqlDbType.Int));
+            Dscmd.Parameters.Add(new MySqlParameter("@torah", SqlDbType.VarChar));
+            Dscmd.Parameters.Add(new MySqlParameter("@haftara", SqlDbType.VarChar));
+
+            Dphcmd.Parameters.Add(new MySqlParameter("@family", SqlDbType.Int));
+            Dphcmd.Parameters.Add(new MySqlParameter("@phone", MySqlDbType.VarChar));
+            Dphcmd.Parameters.Add(new MySqlParameter("@label", MySqlDbType.VarChar));
+
 
             using (var qreader = scmd.ExecuteReader())
             {
@@ -197,14 +208,42 @@ namespace DBTX
                             Dpcmd.Parameters.AddWithValue("@zip", preader["Zip"]);
                             Dpcmd.Parameters.AddWithValue("@comment", preader["Comment"]);
 
+
                             // INSERT PARENT RECORD
-                            npid = uint.Parse(Dpcmd.ExecuteScalar().ToString());
-                            //npid = 1;
+                            npid = uint.Parse(Dpcmd.ExecuteScalar().ToString());                            
 
                             pdict.Add(pid, npid); // this should be new PID
                             Console.WriteLine("    Added parent " + npid);
-                        }
+
+                            // ADD PHONES
+                            Console.Write("Phones:");
+                            try
+                            {
+                                Dphcmd.Parameters["@family"].Value = npid;
+                                var used = new List<string>();
+                                for (int pn = 1; pn < 5; pn++)
+                                {
+                                    var plabel = preader["Phone" + pn + "Name"].ToString();
+                                    var pnum = DigitsIn(preader["Phone" + pn].ToString());
+                                    if (pnum.Length > 6 && !used.Contains(pnum))
+                                    {
+                                        used.Add(pnum);
+                                        Console.Write(" " + pnum);
+                                        Dphcmd.Parameters["@phone"].Value = pnum;
+                                        Dphcmd.Parameters["@label"].Value = plabel;
+                                        Dphcmd.ExecuteNonQuery();
+                                    }
+                                }
+                                Console.WriteLine();
+                            } catch (Exception ex)
+                            {
+
+                                Console.WriteLine(ex.ToString());
+                            }
+
+                        } // end of preader
                         // now npid holds parent
+
 
                         Dscmd.Parameters.Clear();
 
@@ -221,6 +260,8 @@ namespace DBTX
                         Dscmd.Parameters.AddWithValue("@liturgy", 0);
                         Dscmd.Parameters.AddWithValue("@expires", new DateTime(2099, 1, 1));
                         Dscmd.Parameters.AddWithValue("@note", string.Empty);
+                        Dscmd.Parameters.AddWithValue("@torah", qreader["Aux1"]);
+                        Dscmd.Parameters.AddWithValue("@haftara", qreader["Aux2"]);
 
                         // INSERT STUDENT RECORD
                         nstid = uint.Parse(Dscmd.ExecuteScalar().ToString());
@@ -232,6 +273,15 @@ namespace DBTX
                 }
                 return true;
             }
+        }
+        static string DigitsIn(string pn)
+        {
+            var n = string.Empty;
+            for (int q = 0; q < pn.Length; q++)
+            {
+                if (char.IsDigit(pn[q]))  n += pn[q]; 
+            }
+            return n;
         }
     }
     class Prayer
