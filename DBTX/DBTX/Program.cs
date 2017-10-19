@@ -86,9 +86,9 @@ namespace DBTX
                         var r = ireader["rating"].ToString();
                         int rat;
                         if (!int.TryParse(r, out rat)) rat = 0;
-                        
-                            rat = 10 * rat;
-                        
+
+                        rat = 10 * rat;
+
                         ocmd.Parameters["@taskid"].Value = entry.Value;
                         ocmd.Parameters["@date"].Value = ireader.GetDateTime(ireader.GetOrdinal("date")).Date;
                         ocmd.Parameters["@rating"].Value = rat;
@@ -177,12 +177,13 @@ namespace DBTX
                     uint nstid;
                     var orig_stid = uint.Parse(qreader["STID"].ToString());
                     var pid = uint.Parse(qreader["Parent"].ToString());
+                    var haveParent = false;
                     if (pdict.TryGetValue(pid, out npid))
                     {
                         Console.WriteLine("   PARENT EXISTS. PID:" + npid);
-                        continue;
+                        haveParent = true;
                     }
-                    else
+                    if (!haveParent)
                     {
                         // pcmd.Parameters.Clear();
                         pcmd.Parameters["@pid"].Value = pid;    // .AddWithValue("@pid", pid);
@@ -210,7 +211,7 @@ namespace DBTX
 
 
                             // INSERT PARENT RECORD
-                            npid = uint.Parse(Dpcmd.ExecuteScalar().ToString());                            
+                            npid = uint.Parse(Dpcmd.ExecuteScalar().ToString());
 
                             pdict.Add(pid, npid); // this should be new PID
                             Console.WriteLine("    Added parent " + npid);
@@ -235,41 +236,43 @@ namespace DBTX
                                     }
                                 }
                                 Console.WriteLine();
-                            } catch (Exception ex)
+                            }
+                            catch (Exception ex)
                             {
 
                                 Console.WriteLine(ex.ToString());
                             }
 
                         } // end of preader
-                        // now npid holds parent
+                    } // still in student loop
+                      // now npid holds parent
 
 
-                        Dscmd.Parameters.Clear();
+                    Dscmd.Parameters.Clear();
 
-                        Dscmd.Parameters.AddWithValue("@target", qreader["Target"]);
-                        Dscmd.Parameters.AddWithValue("@lname", qreader["Lname"]);
-                        Dscmd.Parameters.AddWithValue("@fname", qreader["Fname"]);
-                        Dscmd.Parameters.AddWithValue("@parent", npid);
-                        Dscmd.Parameters.AddWithValue("@teacher", 1);
-                        Dscmd.Parameters.AddWithValue("@email", qreader["Email"]);
-                        Dscmd.Parameters.AddWithValue("@username", qreader["Username"]);
-                        Dscmd.Parameters.AddWithValue("@password", qreader["Password"]);
-                        Dscmd.Parameters.AddWithValue("@male", qreader["Gender"].ToString().Trim() == "M");
-                        Dscmd.Parameters.AddWithValue("@trial", false);
-                        Dscmd.Parameters.AddWithValue("@liturgy", 0);
-                        Dscmd.Parameters.AddWithValue("@expires", new DateTime(2099, 1, 1));
-                        Dscmd.Parameters.AddWithValue("@note", string.Empty);
-                        Dscmd.Parameters.AddWithValue("@torah", qreader["Aux1"]);
-                        Dscmd.Parameters.AddWithValue("@haftara", qreader["Aux2"]);
+                    Dscmd.Parameters.AddWithValue("@target", qreader["Target"]);
+                    Dscmd.Parameters.AddWithValue("@lname", qreader["Lname"]);
+                    Dscmd.Parameters.AddWithValue("@fname", qreader["Fname"]);
+                    Dscmd.Parameters.AddWithValue("@parent", npid);
+                    Dscmd.Parameters.AddWithValue("@teacher", 1);
+                    Dscmd.Parameters.AddWithValue("@email", qreader["Email"]);
+                    Dscmd.Parameters.AddWithValue("@username", qreader["Username"]);
+                    Dscmd.Parameters.AddWithValue("@password", qreader["Password"]);
+                    Dscmd.Parameters.AddWithValue("@male", qreader["Gender"].ToString().Trim() == "M");
+                    Dscmd.Parameters.AddWithValue("@trial", false);
+                    Dscmd.Parameters.AddWithValue("@liturgy", 0);
+                    Dscmd.Parameters.AddWithValue("@expires", new DateTime(2099, 1, 1));
+                    Dscmd.Parameters.AddWithValue("@note", string.Empty);
+                    Dscmd.Parameters.AddWithValue("@torah", qreader["Aux1"]);
+                    Dscmd.Parameters.AddWithValue("@haftara", qreader["Aux2"]);
 
-                        // INSERT STUDENT RECORD
-                        nstid = uint.Parse(Dscmd.ExecuteScalar().ToString());
-                        //nstid = 2;
+                    // INSERT STUDENT RECORD
+                    nstid = uint.Parse(Dscmd.ExecuteScalar().ToString());
+                    //nstid = 2;
 
-                        Console.WriteLine("   Added student " + nstid);
-                        TransferProgress(dest, src, nstid, orig_stid);
-                    }
+                    Console.WriteLine("   Added student " + nstid);
+                    TransferProgress(dest, src, nstid, orig_stid);
+
                 }
                 return true;
             }
@@ -279,7 +282,7 @@ namespace DBTX
             var n = string.Empty;
             for (int q = 0; q < pn.Length; q++)
             {
-                if (char.IsDigit(pn[q]))  n += pn[q]; 
+                if (char.IsDigit(pn[q])) n += pn[q];
             }
             return n;
         }
